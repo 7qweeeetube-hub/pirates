@@ -242,11 +242,11 @@ async def start(client, message):
         btn = [[
             InlineKeyboardButton('⁉️ ᴄʟᴏsᴇ ⁉️', callback_data='close_data')
         ]]
-    vp = await client.send_cached_media(
+    vp = await client.copy_message(
         chat_id=message.from_user.id,
-        file_id=file_id,
+        from_chat_id=files['chat_id'],   # Retrieved from DB
+        message_id=files['message_id'], # Retrieved from DB
         caption=f_caption,
-        protect_content=False,
         reply_markup=InlineKeyboardMarkup(btn)
     )
     time = get_readable_time(PM_FILE_DELETE_TIME)
