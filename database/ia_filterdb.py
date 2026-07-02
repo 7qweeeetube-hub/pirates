@@ -106,17 +106,24 @@ async def trigger_update_if_new(title, year):
         pass
 
 
-async def save_file(media):
-    file_id = unpack_new_file_id(media.file_id)
+# database/ia_filterdb.py
+
+async def save_file(media, chat_id, message_id):
+    # We use a combined string or the message_id as the unique ID
+    # but storing chat_id and message_id is the key.
     file_name = re.sub(r"@\w+|(_|\-|\.|\+)", " ", str(media.file_name))
     file_caption = re.sub(r"@\w+|(_|\-|\.|\+)", " ", str(media.caption))
     
     document = {
-        '_id': file_id,
         'file_name': file_name,
         'file_size': media.file_size,
-        'caption': file_caption
+        'caption': file_caption,
+        'chat_id': chat_id,      # Store the source channel ID
+        'message_id': message_id # Store the source message ID
     }
+    
+    # We can use a custom string as _id to prevent duplicates across the same channel
+    document['_id'] = f"{chat_id}_{message_id}"
     
     data = PTN.parse(file_name)
     title = data.get('title')
@@ -125,31 +132,15 @@ async def save_file(media):
     try:
         await collection.insert_one(document)
         logger.info(f'Saved - {file_name}')
-        
         await trigger_update_if_new(title, year)
         return 'suc'
-        
     except DuplicateKeyError:
-        logger.warning(f'Already Saved - {file_name}')
         return 'dup'
+    except Exception as e:
+        logger.error(f"Error saving file: {e}")
+        # Fallback to second collection if configured...
+        return 'err'
         
-    except OperationFailure:
-        if SECOND_FILES_DATABASE_URL and second_collection is not None:
-            try:
-                await second_collection.insert_one(document)
-                logger.info(f'Saved to 2nd db - {file_name}')
-                
-                await trigger_update_if_new(title, year)
-                return 'suc'
-                
-            except DuplicateKeyError:
-                logger.warning(f'Already Saved in 2nd db - {file_name}')
-                return 'dup'
-        else:
-            logger.error('Your FILES_DATABASE_URL is full, add SECOND_FILES_DATABASE_URL')
-            return 'err'
-
-
 async def get_search_results(query):
     query = str(query).strip()
     if not query:
