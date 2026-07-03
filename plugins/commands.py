@@ -173,53 +173,60 @@ async def start(client, message):
         total_files_msg = await message.reply(f"<b><i>🗂 Total files - <code>{len(files)}</code></i></b>")
         
         for file in files:
-            # Fetch scraped data for "Send All" items
+            # Fetch data safely (defaults to empty string if missing)
             v_line = file.get('video_line', '')
             dur = file.get('duration', '')
             aud = file.get('audio', '')
             sub = file.get('subtitle', '')
             f_name = file.get('file_name', 'Unknown')
 
-            # 1. Header with your specific link
+            # 1. Header with your link and Static Powered By
             f_caption = (
                 f"<b><a href='https://t.me/tamilmoviesdownloadtorrent'>{f_name}</a></b>\n\n"
                 f"<b>⚜️ Powered By : <a href='https://t.me/tamilmoviesdownloadtorrent'>[ ᴛᴀᴍɪʟ ᴍᴏᴠɪᴇꜱ ]</a></b>"
             )
 
-            # 2. Add Video Info only if exists
+            # 2. Add Video Info & Duration ONLY if they exist
             if v_line or dur:
-                info_line = ""
+                info_parts = []
                 if v_line:
-                    info_line += f"🎬 <code>{v_line}</code>"
-                if v_line and dur:
-                    info_line += "  |  "
+                    info_parts.append(f"🎬 <code>{v_line}</code>")
                 if dur:
-                    info_line += f"⏳ <code>{dur}</code>"
+                    info_parts.append(f"⏳ <code>{dur}</code>")
 
-                f_caption += (
-                    f"\n───────────────────\n"
-                    f"<blockquote>{info_line}</blockquote>"
-                )
+                f_caption += "\n───────────────────\n"
+                f_caption += f"<blockquote>{'  |  '.join(info_parts)}</blockquote>"
 
-            # 3. Add Audio only if exists
+            # 3. Add Audio block ONLY if exists
             if aud:
                 f_caption += f"\n<blockquote>🔊 {aud}</blockquote>"
 
-            # 4. Add Subtitle only if exists
+            # 4. Add Subtitle block ONLY if exists
             if sub:
                 f_caption += f"\n<blockquote>💬 {sub}</blockquote>"
 
+            # --- Buttons ---
             if IS_STREAM:
                 btn = [[
-                    InlineKeyboardButton("✛ ᴡᴀᴛᴄʜ & ᴅᴏᴡɴʟᴏᴀᴅ ✛", callback_data=f"stream#{file['_id']}")
-                ],[
-                    InlineKeyboardButton('⁉️ ᴄʟᴏsᴇ ⁉️', callback_data='close_data')
+                    InlineKeyboardButton(
+                        "✛ ᴡᴀᴛᴄʜ & ᴅᴏᴡɴʟᴏᴀᴅ ✛",
+                        callback_data=f"stream#{file['_id']}"
+                    )
+                ], [
+                    InlineKeyboardButton(
+                        '⁉️ ᴄʟᴏsᴇ ⁉️',
+                        callback_data='close_data'
+                    )
                 ]]
             else:
                 btn = [[
-                    InlineKeyboardButton('⁉️ ᴄʟᴏsᴇ ⁉️', callback_data='close_data')
+                    InlineKeyboardButton(
+                        '⁉️ ᴄʟᴏsᴇ ⁉️',
+                        callback_data='close_data'
+                    )
                 ]]
 
+            # --- Send File ---
             msg = await client.send_cached_media(
                 chat_id=message.from_user.id,
                 file_id=file['_id'],
@@ -227,6 +234,7 @@ async def start(client, message):
                 protect_content=settings.get('file_secure', False),
                 reply_markup=InlineKeyboardMarkup(btn)
             )
+
             file_ids.append(msg.id)
             await asyncio.sleep(2)
 
