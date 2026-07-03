@@ -212,10 +212,13 @@ async def start(client, message):
     grp_id = parts[1] if len(parts) == 3 else 0
     file_id = parts[-1]
     files_ = await get_file_details(file_id)
-    if not files_:
+if not files_:
         return await message.reply('No Such File Exist!')
+    
     files = files_
     settings = await get_settings(int(grp_id))
+
+    # --- Shortlink/Premium Check ---
     if type_ != 'shortlink' and settings['shortlink'] and not await is_premium(message.from_user.id, client):
         link = await get_shortlink(settings['url'], settings['api'], f"https://t.me/{temp.U_NAME}?start=shortlink_{grp_id}_{file_id}")
         btn = [[
@@ -226,12 +229,32 @@ async def start(client, message):
         await message.reply(f"[{get_size(files['file_size'])}] {files['file_name']}\n\nYour file is ready, Please get using this link. 👍", reply_markup=InlineKeyboardMarkup(btn), protect_content=True)
         return
             
-    CAPTION = settings['caption']
-    f_caption = CAPTION.format(
-        file_name = files['file_name'],
-        file_size = get_size(files['file_size']),
-        file_caption=files['caption']
+    # --- New Scraped Data & Caption Construction ---
+    # We fetch the new fields we saved in ia_filterdb.py
+    v_line = files.get('video_line', 'N/A')
+    dur = files.get('duration', 'N/A')
+    aud = files.get('audio', 'N/A')
+    sub = files.get('subtitle', 'N/A')
+    f_name = files.get('file_name', 'Unknown')
+
+    # Try to get the name of the group where the file was found
+    try:
+        chat = await client.get_chat(int(grp_id))
+        g_title = chat.title
+    except:
+        g_title = "ᴛᴀᴍɪʟ ᴍᴏᴠɪᴇꜱ" # Default if group name can't be fetched
+
+    # Your custom template with <blockquote> for the quoted look
+    f_caption = (
+        f"📌 <b>{f_name}</b>\n\n"
+        f"⚜️ Powered By : [ {g_title} ]\n"
+        f"───────────────────\n"
+        f"<blockquote>🎬 <code>{v_line}</code>  |  ⏳ <code>{dur}</code></blockquote>\n"
+        f"<blockquote>🔊 <b>Audio:</b> {aud}</blockquote>\n"
+        f"<blockquote>💬 <b>Subtitle:</b> {sub}</blockquote>"
     )
+
+    # --- Button Construction ---
     if IS_STREAM:
         btn = [[
             InlineKeyboardButton("✛ ᴡᴀᴛᴄʜ & ᴅᴏᴡɴʟᴏᴀᴅ ✛", callback_data=f"stream#{file_id}")
@@ -242,10 +265,12 @@ async def start(client, message):
         btn = [[
             InlineKeyboardButton('⁉️ ᴄʟᴏsᴇ ⁉️', callback_data='close_data')
         ]]
+
+    # --- Sending the Message ---
     vp = await client.copy_message(
         chat_id=message.from_user.id,
-        from_chat_id=files['chat_id'],   # Retrieved from DB
-        message_id=files['message_id'], # Retrieved from DB
+        from_chat_id=files['chat_id'],   
+        message_id=files['message_id'], 
         caption=f_caption,
         reply_markup=InlineKeyboardMarkup(btn)
     )
