@@ -266,33 +266,41 @@ async def start(client, message):
         await message.reply(f"[{get_size(files['file_size'])}] {files['file_name']}\n\nYour file is ready, Please get using this link. 👍", reply_markup=InlineKeyboardMarkup(btn), protect_content=True)
         return
             
-    # New Scraped Data
-    v_line = files.get('video_line', 'N/A')
-    dur = files.get('duration', 'N/A')
-    aud = files.get('audio', 'N/A')
-    sub = files.get('subtitle', 'N/A')
+# Individual File logic (using 'files' variable)
+    v_line = files.get('video_line', '')
+    dur = files.get('duration', '')
+    aud = files.get('audio', '')
+    sub = files.get('subtitle', '')
     f_name = files.get('file_name', 'Unknown')
 
-    try:
-        chat = await client.get_chat(int(grp_id))
-        g_title = chat.title
-    except:
-        g_title = "ᴛᴀᴍɪʟ ᴍᴏᴠɪᴇꜱ"
-
     f_caption = (
-        f"📌 <b>{f_name}</b>\n\n"
-        f"⚜️ Powered By : [ {g_title} ]\n"
-        f"───────────────────\n"
-        f"<blockquote>🎬 <code>{v_line}</code>  |  ⏳ <code>{dur}</code></blockquote>\n"
-        f"<blockquote>🔊 <b>Audio:</b> {aud}</blockquote>\n"
-        f"<blockquote>💬 <b>Subtitle:</b> {sub}</blockquote>"
+        f"<b><a href='https://t.me/tamilmoviesdownloadtorrent'>{f_name}</a></b>\n\n"
+        f"<b>⚜️ Powered By : <a href='https://t.me/tamilmoviesdownloadtorrent'>[ ᴛᴀᴍɪʟ ᴍᴏᴠɪᴇꜱ ]</a></b>"
     )
 
+    if v_line or dur:
+        info_parts = []
+        if v_line: info_parts.append(f"🎬 <code>{v_line}</code>")
+        if dur: info_parts.append(f"⏳ <code>{dur}</code>")
+        f_caption += f"\n───────────────────\n"
+        f_caption += f"<blockquote>{'  |  '.join(info_parts)}</blockquote>"
+
+    if aud:
+        f_caption += f"\n<blockquote>🔊 {aud}</blockquote>"
+
+    if sub:
+        f_caption += f"\n<blockquote>💬 {sub}</blockquote>"
+
     if IS_STREAM:
-        btn = [[InlineKeyboardButton("✛ ᴡᴀᴛᴄʜ & ᴅᴏᴡɴʟᴏᴀᴅ ✛", callback_data=f"stream#{file_id}")],
-               [InlineKeyboardButton('⁉️ ᴄʟᴏsᴇ ⁉️', callback_data='close_data')]]
+        btn = [[
+            InlineKeyboardButton("✛ ᴡᴀᴛᴄʜ & ᴅᴏᴡɴʟᴏᴀᴅ ✛", callback_data=f"stream#{file_id}")
+        ],[
+            InlineKeyboardButton('⁉️ ᴄʟᴏsᴇ ⁉️', callback_data='close_data')
+        ]]
     else:
-        btn = [[InlineKeyboardButton('⁉️ ᴄʟᴏsᴇ ⁉️', callback_data='close_data')]]
+        btn = [[
+            InlineKeyboardButton('⁉️ ᴄʟᴏsᴇ ⁉️', callback_data='close_data')
+        ]]
 
     vp = await client.copy_message(
         chat_id=message.from_user.id,
