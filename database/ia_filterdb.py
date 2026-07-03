@@ -109,39 +109,38 @@ async def trigger_update_if_new(title, year):
 # database/ia_filterdb.py
 
 # database/ia_filterdb.py
+# MY code/database/ia_filterdb.py
 
 async def save_file(media, chat_id, message_id):
-    # 1. Basic cleaning of filename and caption
+    # Basic cleaning
     file_name = re.sub(r"@\w+|(_|\-|\.|\+)", " ", str(media.file_name))
     caption = str(media.caption) if media.caption else ""
     file_caption = re.sub(r"@\w+|(_|\-|\.|\+)", " ", caption)
-
-    # --- NEW: AUDIO SCRAPING LOGIC ---
+    
+    # --- AUDIO SCRAPING LOGIC ---
     audio_languages = ""
     if caption:
-        # Strip HTML tags (like <b>, <code>) to make regex more reliable
+        # Strip HTML tags
         clean_cap = re.sub(r'<[^>]+>', '', caption)
         
-        # Look for "Audio:" followed by the languages
-        # This matches "Audio: Tamil, Hindi" or "🔊 Audio: English"
+        # Match "Audio: LanguageName"
+        # Since your template is: 🔊 Audio: {audio}
         match = re.search(r"Audio:\s*(.*)", clean_cap, re.IGNORECASE)
         if match:
             extracted_audio = match.group(1).strip()
             
-            # If the caption has "Subtitle" after Audio, we cut it off there
-            # to avoid grabbing the subtitle list as well
+            # Cut off if "Subtitle" follows it
             if "Subtitle" in extracted_audio:
                 extracted_audio = extracted_audio.split("Subtitle")[0].strip()
             
-            # Remove any trailing emojis (like 💬) that might be attached
-            extracted_audio = re.sub(r"[💬💬📌🎬⏳🔊]", "", extracted_audio).strip()
+            # Remove emojis and extra characters
+            extracted_audio = re.sub(r"[🔊💬📌🎬⏳|]", "", extracted_audio).strip()
             audio_languages = extracted_audio
 
-    # Append audio languages to the indexed file_name so it's searchable
+    # Append languages to the searchable filename
     if audio_languages:
-        # We add it to the name variable used for the DB entry
         file_name = f"{file_name} {audio_languages}"
-    # ---------------------------------
+    # -----------------------------
 
     document = {
         'file_name': file_name,
@@ -153,6 +152,7 @@ async def save_file(media, chat_id, message_id):
     
     document['_id'] = f"{chat_id}_{message_id}"
     
+    # PTN parsing for metadata
     data = PTN.parse(file_name)
     title = data.get('title')
     year = data.get('year')
