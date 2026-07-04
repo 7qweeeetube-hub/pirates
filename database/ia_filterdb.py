@@ -105,13 +105,6 @@ async def trigger_update_if_new(title, year):
     except DuplicateKeyError:
         pass
 
-
-# database/ia_filterdb.py
-
-# database/ia_filterdb.py
-
-# database/ia_filterdb.py -> Inside save_file function
-
 async def save_file(media, chat_id, message_id):
     # 1. Clean the original filename
     base_file_name = re.sub(r"@\w+|(_|\-|\.|\+)", " ", str(media.file_name))
@@ -122,7 +115,7 @@ async def save_file(media, chat_id, message_id):
     audio = ""
     subtitle = ""
 
-    # 2. Keep your extraction logic exactly as it was
+    # 2. Extraction logic
     if caption:
         clean_cap = re.sub(r'<[^>]+>', '', caption)
         
@@ -141,28 +134,26 @@ async def save_file(media, chat_id, message_id):
             if "Subtitle" in aud_text: aud_text = aud_text.split("Subtitle")[0]
             audio = aud_text.strip()
 
-        # Extract Subtitle
+        # Extract Subtitle (Still extracting it for the DB field, but we won't put it in the search name)
         sub_match = re.search(r"(?:💬|Subtitle:)\s*(.*)", clean_cap, re.IGNORECASE)
         if sub_match:
             sub_text = sub_match.group(1).split('\n')[0].strip()
             subtitle = sub_text.replace("#", "").strip()
 
-    # 3. THE OPTIMIZATION FOR 20 LAKH FILES:
-    # We combine the name + audio + subtitle into one string for the SEARCH field.
-    # This makes "MovieName Tamil" searchable in a single database hit.
-    searchable_name = f"{base_file_name} {audio} {subtitle}"
+    # 3. UPDATED SEARCHABLE NAME (Only adding Audio here)
+    searchable_name = f"{base_file_name} {audio}"
     searchable_name = re.sub(r"\s+", " ", searchable_name).strip()
 
     document = {
         '_id': f"{chat_id}_{message_id}",
-        'file_name': searchable_name, # This is what the Search uses (FAST)
+        'file_name': searchable_name, # Search finds: "Movie Name Tamil"
         'file_size': media.file_size,
         'chat_id': chat_id,
         'message_id': message_id,
-        'video_line': video_line,     # Used for captions
-        'duration': duration,         # Used for captions
-        'audio': audio,               # Used for Quality/Lang buttons
-        'subtitle': subtitle          # Used for Quality/Lang buttons
+        'video_line': video_line,
+        'duration': duration,
+        'audio': audio,              # Still saved here for the "Language" button
+        'subtitle': subtitle         # Still saved here for metadata, but hidden from search
     }
     
     try:
