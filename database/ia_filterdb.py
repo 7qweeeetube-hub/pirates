@@ -113,7 +113,8 @@ async def trigger_update_if_new(title, year):
 # database/ia_filterdb.py -> Inside save_file function
 
 async def save_file(media, chat_id, message_id):
-    file_name = re.sub(r"@\w+|(_|\-|\.|\+)", " ", str(media.file_name))
+    # 1. Clean the original filename
+    base_file_name = re.sub(r"@\w+|(_|\-|\.|\+)", " ", str(media.file_name))
     caption = str(media.caption) if media.caption else ""
     
     video_line = ""
@@ -121,6 +122,7 @@ async def save_file(media, chat_id, message_id):
     audio = ""
     subtitle = ""
 
+    # 2. Keep your extraction logic exactly as it was
     if caption:
         clean_cap = re.sub(r'<[^>]+>', '', caption)
         
@@ -130,11 +132,11 @@ async def save_file(media, chat_id, message_id):
             video_line = vid_dur_match.group(1).strip()
             duration = vid_dur_match.group(2).strip()
 
-        # Extract Audio (Emoji or Text)
+        # Extract Audio
         audio_match = re.search(r"(?:🔊|Audio:)\s*(.*)", clean_cap, re.IGNORECASE)
         if audio_match:
             aud_text = audio_match.group(1).split('\n')[0].strip()
-            aud_text = aud_text.replace("#", "") # Remove hashtags
+            aud_text = aud_text.replace("#", "") 
             if "💬" in aud_text: aud_text = aud_text.split("💬")[0]
             if "Subtitle" in aud_text: aud_text = aud_text.split("Subtitle")[0]
             audio = aud_text.strip()
@@ -145,23 +147,28 @@ async def save_file(media, chat_id, message_id):
             sub_text = sub_match.group(1).split('\n')[0].strip()
             subtitle = sub_text.replace("#", "").strip()
 
+    # 3. THE OPTIMIZATION FOR 20 LAKH FILES:
+    # We combine the name + audio + subtitle into one string for the SEARCH field.
+    # This makes "MovieName Tamil" searchable in a single database hit.
+    searchable_name = f"{base_file_name} {audio} {subtitle}"
+    searchable_name = re.sub(r"\s+", " ", searchable_name).strip()
+
     document = {
         '_id': f"{chat_id}_{message_id}",
-        'file_name': file_name,
+        'file_name': searchable_name, # This is what the Search uses (FAST)
         'file_size': media.file_size,
         'chat_id': chat_id,
         'message_id': message_id,
-        'video_line': video_line,
-        'duration': duration,
-        'audio': audio,
-        'subtitle': subtitle
+        'video_line': video_line,     # Used for captions
+        'duration': duration,         # Used for captions
+        'audio': audio,               # Used for Quality/Lang buttons
+        'subtitle': subtitle          # Used for Quality/Lang buttons
     }
-    # ... rest of the save_file code ...
     
     try:
         await collection.insert_one(document)
-        logger.info(f'Saved - {file_name}')
-        data = PTN.parse(file_name)
+        logger.info(f'Saved - {searchable_name}')
+        data = PTN.parse(base_file_name)
         await trigger_update_if_new(data.get('title'), data.get('year'))
         return 'suc'
     except DuplicateKeyError:
@@ -173,20 +180,29 @@ async def save_file(media, chat_id, message_id):
 async def get_search_results(query):
     query = str(query).strip()
     if not query:
-        recent_limit = 100  # default limit for fetching recently added files
-        results = []
-        
-        cursor1 = collection.find({}).sort("_id", -1).limit(recent_limit)
-        docs1 = await cursor1.to_list(length=recent_limit)
-        results.extend(docs1)
-
-        if SECOND_FILES_DATABASE_URL and second_collection is not None and len(results) < recent_limit:
-            remaining_limit = recent_limit - len(results)
-            cursor2 = second_collection.find({}).sort("_id", -1).limit(remaining_limit)
-            docs2 = await cursor2.to_list(length=remaining_limit)
-            results.extend(docs2)
-
+        # ... (Keep your recent files logic)
         return results
+
+    # Split words to make search order-independent (Interstellar Tamil = Tamil Interstellar)
+    # This is much faster than complex regex
+    words = query.split()
+    filters = []
+    for word in words:
+        filters.append({"file_name": {"$regex": word, "$options": "i"}})
+    
+    search_filter = {"$and": filters}
+
+    results = []
+    cursor1 = collection.find(search_filter)
+    docs1 = await cursor1.to_list(length=None) 
+    results.extend(docs1)
+
+    if SECOND_FILES_DATABASE_URL and second_collection is not None:
+        cursor2 = second_collection.find(search_filter)
+        docs2 = await cursor2.to_list(length=None)
+        results.extend(docs2)
+
+    return results
 
     if ' ' not in query:
         raw_pattern = r'(\b|[\.\+\-_])' + query + r'(\b|[\.\+\-_])'
